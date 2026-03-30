@@ -26,14 +26,36 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.home {
+.layout {
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.home {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2rem;
   text-align: center;
+}
+
+.site-footer {
+  flex-shrink: 0;
+  width: 100%;
+  border-top: 1px solid #ffffff;
+  padding: 1rem 2rem;
+  text-align: center;
+}
+
+.site-footer__copy {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.01em;
 }
 
 .title {
