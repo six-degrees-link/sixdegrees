@@ -1,3 +1,6 @@
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
+
 export default function App() {
   return (
     <div className="layout">
@@ -55,6 +58,8 @@ export default function App() {
       <footer className="site-footer">
         <p className="site-footer__copy">© 2026 SixDegrees</p>
       </footer>
+      <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
