@@ -1,16 +1,21 @@
 export default function App() {
   return (
     <div className="layout">
-      <main className="home">
+      <header className="navbar" role="banner">
+        <a href="/" className="navbar__logo">
+          SixDegrees
+        </a>
+      </header>
+      <main className="home" id="main-content">
         <div className="hero">
           <h1 className="title">SixDegrees</h1>
-          <h2 className="subtitle">
+          <p className="subtitle">
             The Bot Free alternative to LoinkedIN
-          </h2>
+          </p>
         </div>
 
         <section className="manifesto" aria-labelledby="manifesto-heading">
-          <div className="manifesto__box">
+          <div className="manifesto__box card">
             <h2 id="manifesto-heading" className="manifesto__title">
               Manifesto
             </h2>
