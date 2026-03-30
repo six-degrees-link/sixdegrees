@@ -37,9 +37,58 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  justify-content: flex-start;
+  padding: clamp(2rem, 6vh, 3.5rem) 2rem 2rem;
+  gap: 2.25rem;
   text-align: center;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.manifesto {
+  width: 100%;
+  max-width: 38rem;
+}
+
+.manifesto__box {
+  border: 1px solid #ffffff;
+  padding: 1.25rem 1.5rem;
+  color: #ffffff;
+  font-family:
+    "SF Compact Text",
+    "SF Compact Display",
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  font-size: clamp(0.875rem, 2.2vw, 0.9375rem);
+  line-height: 1.55;
+  text-align: left;
+}
+
+.manifesto__title {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.manifesto__body {
+  margin: 0;
+}
+
+.manifesto__body p {
+  margin: 0 0 1em;
+}
+
+.manifesto__body p:last-child {
+  margin-bottom: 0;
 }
 
 .site-footer {

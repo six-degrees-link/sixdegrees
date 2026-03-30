@@ -5,9 +5,19 @@
 # Container Scanning customization: https://docs.gitlab.com/user/application_security/container_scanning/#customizing-analyzer-behavior
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ci/variables/#cicd-variable-precedence
+#
+# Option A — Deploy via GitLab CI + Vercel CLI (no Vercel→GitLab “import repo” required).
+# 1. Vercel: create an empty project (or link once with `vercel link` locally) for this app.
+# 2. If this repo is also connected under Vercel → Project → Git, disconnect it to avoid double deploys.
+# 3. Set variables: run ./scripts/prompt-gitlab-vercel-variables.sh (glab), or GitLab → Settings → CI/CD → Variables:
+#      VERCEL_TOKEN       — https://vercel.com/account/tokens
+#      VERCEL_ORG_ID      — Vercel → Project → Settings → General
+#      VERCEL_PROJECT_ID  — same
+# Guide: https://vercel.com/guides/how-can-i-use-gitlab-pipelines-with-vercel
 stages:
 - test
 - secret-detection
+- deploy
 sast:
   stage: test
 include:
@@ -17,3 +27,34 @@ variables:
   SECRET_DETECTION_ENABLED: 'true'
 secret_detection:
   stage: secret-detection
+
+# Runs only when VERCEL_* variables are set (otherwise rules skip these jobs).
+deploy_vercel_preview:
+  stage: deploy
+  image: node:22-bookworm
+  environment:
+    name: vercel/preview/$CI_COMMIT_REF_SLUG
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "main" && $VERCEL_TOKEN && $VERCEL_ORG_ID && $VERCEL_PROJECT_ID'
+  before_script:
+    - npm ci
+  script:
+    - npm install -g vercel@latest
+    - vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+    - vercel build --token=$VERCEL_TOKEN
+    - vercel deploy --prebuilt --token=$VERCEL_TOKEN -m gitlabDeployment=1 -m gitlabCommitRef=$CI_COMMIT_REF_NAME
+
+deploy_vercel_production:
+  stage: deploy
+  image: node:22-bookworm
+  environment:
+    name: vercel/production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $VERCEL_TOKEN && $VERCEL_ORG_ID && $VERCEL_PROJECT_ID'
+  before_script:
+    - npm ci
+  script:
+    - npm install -g vercel@latest
+    - vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+    - vercel build --prod --token=$VERCEL_TOKEN
+    - vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN -m gitlabDeployment=1 -m gitlabCommitRef=$CI_COMMIT_REF_NAME
