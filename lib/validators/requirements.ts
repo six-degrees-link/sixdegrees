@@ -28,6 +28,7 @@ export const FeatureCategorySchema = z.enum([
   'analytics',
   'microsites',
   'moderation',
+  'accessibility',
   'other',
 ])
 

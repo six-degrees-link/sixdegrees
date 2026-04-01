@@ -76,5 +76,6 @@ export const CATEGORIES: { value: FeatureCategory; label: string }[] = [
   { value: 'moderation', label: 'Moderation' },
   { value: 'admin', label: 'Admin' },
   { value: 'billing', label: 'Billing' },
+  { value: 'accessibility', label: 'Accessibility' },
   { value: 'other', label: 'Other' },
 ]
