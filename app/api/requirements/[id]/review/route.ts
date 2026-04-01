@@ -81,20 +81,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   // Update status
-  const { data: updated, error } = await service
+  const { data: rows, error } = await service
     .from('requirements')
     .update({ status: newStatus })
     .eq('id', id)
     .select('id, status, refined_title, raw_input')
-    .single()
 
-  if (error || !updated) {
+  if (error || !rows || rows.length === 0) {
     console.error('Review update failed:', JSON.stringify(error))
     return NextResponse.json(
       { error: error?.message ?? 'Failed to update status', code: 'INTERNAL_ERROR' },
       { status: 500 }
     )
   }
+
+  const updated = rows[0]
 
   // Send approval email
   if (newStatus === 'approved') {
