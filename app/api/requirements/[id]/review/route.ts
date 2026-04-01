@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { status: newStatus } = parsed.data
 
   // Use service client for all DB writes — RLS would block admins updating others' requirements
-  const service = await createServiceClient()
+  const service = createServiceClient()
 
   // Fetch requirement + contributor email
   const { data: requirement } = await service

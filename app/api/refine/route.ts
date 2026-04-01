@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     const outputTokens = message.usage.output_tokens
     const costUsd = (inputTokens * 0.003 + outputTokens * 0.015) / 1000
 
-    const serviceSupabase = await createServiceClient()
+    const serviceSupabase = createServiceClient()
     await serviceSupabase.from('ai_usage_log').insert({
       contributor_id: user.id,
       tokens_input: inputTokens,
