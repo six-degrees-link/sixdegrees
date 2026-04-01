@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/auth/admin'
 import { sendRequirementApproved } from '@/lib/email'
 
@@ -55,8 +55,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { status: newStatus } = parsed.data
 
+  // Use service client for all DB writes — RLS would block admins updating others' requirements
+  const service = await createServiceClient()
+
   // Fetch requirement + contributor email
-  const { data: requirement } = await supabase
+  const { data: requirement } = await service
     .from('requirements')
     .select('id, status, refined_title, raw_input, contributors!inner(email, display_name)')
     .eq('id', id)
@@ -78,7 +81,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   // Update status
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await service
     .from('requirements')
     .update({ status: newStatus })
     .eq('id', id)
