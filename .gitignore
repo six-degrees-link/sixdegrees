@@ -10,5 +10,8 @@ dist-ssr
 *.local
 .next
 out
+tsconfig.tsbuildinfo
+next-env.d.ts
+supabase/.temp
 
 .vercel
