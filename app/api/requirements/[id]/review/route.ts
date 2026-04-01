@@ -89,8 +89,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single()
 
   if (error || !updated) {
+    console.error('Review update failed:', JSON.stringify(error))
     return NextResponse.json(
-      { error: 'Failed to update status', code: 'INTERNAL_ERROR' },
+      { error: error?.message ?? 'Failed to update status', code: 'INTERNAL_ERROR' },
       { status: 500 }
     )
   }
