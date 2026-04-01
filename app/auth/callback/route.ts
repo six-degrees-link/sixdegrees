@@ -1,11 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
  * Magic link / OAuth callback handler.
  * Supabase redirects here after email confirmation with a one-time code.
- * We exchange it for a session and redirect the user onward.
+ *
+ * IMPORTANT: the redirect response must be created first so Supabase can
+ * attach session cookies to it during exchangeCodeForSession. If you create
+ * a new response after the exchange the cookies are lost.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -13,7 +15,8 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    const cookieStore = await cookies()
+    const redirectTo = `${origin}${next}`
+    const response = NextResponse.redirect(redirectTo)
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,11 +24,12 @@ export async function GET(request: NextRequest) {
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll()
+            return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
+            // Write session cookies directly onto the redirect response
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              response.cookies.set(name, value, options)
             )
           },
         },
@@ -35,10 +39,9 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return response
     }
   }
 
-  // Something went wrong — redirect to an error page
   return NextResponse.redirect(`${origin}/auth/error`)
 }
