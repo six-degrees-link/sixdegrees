@@ -30,7 +30,7 @@ Transform a plain-language feature request into a structured user story with ful
 
 ## Feature Categories
 
-profile, messaging, search, jobs, content, networking, verification, admin, billing, notifications, analytics, microsites, moderation, other
+accessibility, admin, analytics, billing, content, jobs, messaging, microsites, moderation, networking, notifications, profile, search, verification, other
 
 ## Output Format
 

@@ -140,6 +140,12 @@ export async function POST(req: NextRequest) {
         { status: 504 }
       )
     }
+    if (err.status === 400 && err.message?.includes('content filtering')) {
+      return NextResponse.json(
+        { error: 'Your request was flagged by content filtering. Try rephrasing it, or submit without AI refinement.', code: 'AI_UNAVAILABLE' },
+        { status: 422 }
+      )
+    }
     console.error('Claude API error:', error)
     return NextResponse.json(
       { error: 'AI refinement failed. You can still submit without it.', code: 'AI_UNAVAILABLE' },
