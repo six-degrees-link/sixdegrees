@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/auth/admin'
 import { NavbarUser } from './navbar-user'
 
 export async function Navbar() {
@@ -22,6 +23,11 @@ export async function Navbar() {
             <Link href="/submit" className="navbar__link">
               Contribute
             </Link>
+            {isAdmin(user) && (
+              <Link href="/admin" className="navbar__link navbar__link--admin">
+                Admin
+              </Link>
+            )}
           </nav>
         </div>
         <div className="navbar__right">

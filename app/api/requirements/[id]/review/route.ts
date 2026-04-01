@@ -1,0 +1,107 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/auth/admin'
+import { sendRequirementApproved } from '@/lib/email'
+
+type Params = { params: Promise<{ id: string }> }
+
+const ReviewSchema = z.object({
+  status: z.enum(['in_review', 'approved', 'rejected']),
+})
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  submitted:  ['in_review', 'approved', 'rejected'],
+  in_review:  ['approved', 'rejected'],
+  approved:   ['rejected'],
+  rejected:   ['in_review', 'approved'],
+  draft:      ['submitted', 'in_review', 'approved', 'rejected'],
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Authentication required', code: 'UNAUTHORIZED' },
+      { status: 401 }
+    )
+  }
+
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'Admin access required', code: 'FORBIDDEN' },
+      { status: 403 }
+    )
+  }
+
+  let body: unknown
+  try { body = await req.json() } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON', code: 'VALIDATION_ERROR' },
+      { status: 400 }
+    )
+  }
+
+  const parsed = ReviewSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' },
+      { status: 400 }
+    )
+  }
+
+  const { status: newStatus } = parsed.data
+
+  // Fetch requirement + contributor email
+  const { data: requirement } = await supabase
+    .from('requirements')
+    .select('id, status, refined_title, raw_input, contributors!inner(email, display_name)')
+    .eq('id', id)
+    .single()
+
+  if (!requirement) {
+    return NextResponse.json(
+      { error: 'Requirement not found', code: 'NOT_FOUND' },
+      { status: 404 }
+    )
+  }
+
+  const allowed = VALID_TRANSITIONS[requirement.status] ?? []
+  if (!allowed.includes(newStatus)) {
+    return NextResponse.json(
+      { error: `Cannot transition from "${requirement.status}" to "${newStatus}"`, code: 'VALIDATION_ERROR' },
+      { status: 400 }
+    )
+  }
+
+  // Update status
+  const { data: updated, error } = await supabase
+    .from('requirements')
+    .update({ status: newStatus })
+    .eq('id', id)
+    .select('id, status, refined_title, raw_input')
+    .single()
+
+  if (error || !updated) {
+    return NextResponse.json(
+      { error: 'Failed to update status', code: 'INTERNAL_ERROR' },
+      { status: 500 }
+    )
+  }
+
+  // Send approval email
+  if (newStatus === 'approved') {
+    const contributor = requirement.contributors as { email: string; display_name: string | null }
+    const title = requirement.refined_title ?? requirement.raw_input.slice(0, 80)
+    await sendRequirementApproved({
+      to: contributor.email,
+      requirementTitle: title,
+      requirementId: id,
+    }).catch((err) => console.error('Failed to send approval email:', err))
+  }
+
+  return NextResponse.json({ data: updated })
+}
