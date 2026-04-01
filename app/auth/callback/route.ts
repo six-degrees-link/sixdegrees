@@ -15,8 +15,9 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    const redirectTo = `${origin}${next}`
-    const response = NextResponse.redirect(redirectTo)
+    const confirmUrl = new URL('/auth/confirm', origin)
+    confirmUrl.searchParams.set('next', next)
+    const response = NextResponse.redirect(confirmUrl.toString())
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
