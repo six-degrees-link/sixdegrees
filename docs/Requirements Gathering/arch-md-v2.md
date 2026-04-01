@@ -27,123 +27,75 @@ The output is a prioritized, community-validated product backlog for the SixDegr
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Framework | Next.js (App Router) | 14+ |
+| Framework | Next.js (App Router) | 16.2.2 |
 | Language | TypeScript | Strict mode |
-| Styling | Tailwind CSS + CSS custom properties | Latest |
+| Styling | Tailwind CSS v4 + CSS custom properties | 4.x |
 | Database | Supabase (PostgreSQL) | Latest |
 | Auth | Supabase Auth (magic links) | - |
 | AI | Anthropic Claude API | claude-sonnet-4-20250514 |
 | Hosting | Vercel | - |
 | Icons | Lucide Icons | Latest |
 | Validation | Zod | Latest |
-| Font | Inter Variable | Latest |
+| Font | Inter Variable (next/font) | Latest |
 
 ## Project Structure
 
 ```
-sixdegrees-requirements/
-├── app/
-│   ├── layout.tsx              # Root layout with Inter font, design tokens
-│   ├── page.tsx                # Landing page
-│   ├── globals.css             # Design system tokens (see DESIGN_SYSTEM.md)
+sixdegrees/
+├── app/                                  # ✅ EXISTS
+│   ├── layout.tsx                        # Root layout — next/font Inter, GTM, Analytics
+│   ├── page.tsx                          # Landing page (Server Component)
+│   ├── globals.css                       # Design system CSS tokens
 │   ├── auth/
 │   │   └── callback/
-│   │       └── route.ts        # Magic link callback handler
-│   ├── submit/
-│   │   └── page.tsx            # Requirement submission form
-│   ├── browse/
-│   │   └── page.tsx            # Browse/filter requirements
-│   ├── requirements/
-│   │   └── [id]/
-│   │       └── page.tsx        # Requirement detail with voting/comments
-│   ├── dashboard/
-│   │   └── page.tsx            # Coverage dashboard
-│   ├── leaderboard/
-│   │   └── page.tsx            # Contributor leaderboard
-│   ├── admin/
-│   │   └── page.tsx            # Moderation tools (admin-only)
+│   │       └── route.ts                  # Magic link code exchange handler
+│   ├── submit/                           # 🔜 M2
+│   │   └── page.tsx
+│   ├── browse/                           # 🔜 M2
+│   │   └── page.tsx
+│   ├── requirements/[id]/                # 🔜 M2
+│   │   └── page.tsx
+│   ├── dashboard/                        # 🔜 M4
+│   │   └── page.tsx
+│   ├── leaderboard/                      # 🔜 M4
+│   │   └── page.tsx
+│   ├── admin/                            # 🔜 M4
+│   │   └── page.tsx
 │   └── api/
-│       ├── requirements/
-│       │   ├── route.ts        # GET (list), POST (create)
-│       │   ├── [id]/
-│       │   │   ├── route.ts    # GET (detail), PATCH (update)
-│       │   │   ├── vote/
-│       │   │   │   └── route.ts # POST (vote), DELETE (remove vote)
-│       │   │   └── comments/
-│       │   │       └── route.ts # GET (list), POST (create)
-│       │   └── stats/
-│       │       └── route.ts    # GET (dashboard stats)
-│       └── refine/
-│           └── route.ts        # POST (Claude AI refinement)
-├── components/
-│   ├── ui/                     # Design system components
-│   │   ├── Button.tsx
-│   │   ├── Input.tsx
-│   │   ├── Select.tsx
-│   │   ├── Textarea.tsx
-│   │   ├── Toggle.tsx
-│   │   ├── Card.tsx
-│   │   ├── Badge.tsx
-│   │   ├── Modal.tsx
-│   │   ├── Skeleton.tsx
-│   │   ├── Toast.tsx
-│   │   ├── ListItem.tsx
-│   │   └── Navbar.tsx
-│   ├── auth/
-│   │   ├── AuthProvider.tsx    # Supabase auth context
-│   │   └── EmailAuth.tsx       # Magic link email input
-│   ├── requirements/
-│   │   ├── SubmitForm.tsx      # Main submission form
-│   │   ├── PersonaPicker.tsx   # Persona type selector
-│   │   ├── RefinementView.tsx  # AI refinement side-by-side view
-│   │   ├── RequirementCard.tsx # Card for browse list
-│   │   ├── RequirementDetail.tsx
-│   │   ├── VoteButtons.tsx
-│   │   └── CommentThread.tsx
-│   └── dashboard/
-│       ├── StatsCards.tsx
-│       ├── PersonaCoverage.tsx
-│       └── TopVoted.tsx
+│       ├── requirements/                 # 🔜 M2
+│       │   ├── route.ts
+│       │   ├── [id]/route.ts
+│       │   ├── [id]/vote/route.ts
+│       │   ├── [id]/comments/route.ts
+│       │   └── stats/route.ts
+│       └── refine/route.ts               # 🔜 M3
+├── components/                           # 🔜 M2 — not yet created
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts           # Browser client
-│   │   ├── server.ts           # Server client (for API routes)
-│   │   └── middleware.ts       # Auth middleware
-│   ├── claude/
-│   │   ├── refine.ts           # Claude API integration
-│   │   ├── prompts.ts          # System prompt and templates
-│   │   └── parse.ts            # Response parsing and validation
-│   ├── validators/
-│   │   └── requirements.ts     # Zod schemas
-│   └── constants/
-│       ├── personas.ts         # Persona definitions and prompts
-│       └── categories.ts       # Feature categories
-├── types/
-│   ├── database.ts             # Supabase generated types
-│   ├── requirements.ts         # Requirement-related types
-│   └── api.ts                  # API request/response types
-├── hooks/
-│   ├── useAuth.ts
-│   ├── useRequirements.ts
-│   └── useVotes.ts
+│   ├── supabase/                         # ✅ EXISTS
+│   │   ├── client.ts                     # createBrowserClient (@supabase/ssr)
+│   │   ├── server.ts                     # createServerClient + createServiceClient
+│   │   └── types.ts                      # Generated via: supabase gen types typescript
+│   ├── claude/                           # 🔜 M3
+│   ├── validators/                       # 🔜 M2
+│   └── constants/                        # 🔜 M2
 ├── supabase/
-│   └── migrations/
-│       └── 001_initial_schema.sql
+│   └── migrations/                       # ✅ EXISTS — applied to production
+│       ├── 20260401000000_initial_schema.sql
+│       ├── 20260401000001_rls_policies.sql
+│       └── 20260401000002_functions_triggers.sql
 ├── public/
-├── docs/                       # These context files
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE.md
-│   ├── API.md
-│   ├── AI_INTEGRATION.md
-│   ├── FRONTEND.md
-│   ├── DESIGN_SYSTEM.md
-│   └── PERSONAS.md
-├── .env.local                  # Environment variables
-├── next.config.js
+│   └── favicon.svg
+├── docs/                                 # These context files
+├── proxy.ts                              # ✅ EXISTS — auth session refresh (Next.js 16)
+├── .env.example                          # ✅ EXISTS
+├── next.config.ts
 ├── tailwind.config.ts
+├── postcss.config.mjs
 ├── tsconfig.json
 └── package.json
 ```
+
+**Legend**: ✅ Built and deployed | 🔜 Planned (milestone noted)
 
 ## Key Conventions
 
@@ -171,9 +123,10 @@ sixdegrees-requirements/
 
 ### Authentication
 - Supabase magic links (email-only, no passwords)
-- Auth state managed via React context (`AuthProvider`)
-- Protected routes check auth in middleware
-- API routes verify auth via Supabase server client
+- Auth state managed via React context (`AuthProvider`) — 🔜 M2
+- Protected routes checked in `proxy.ts` (Next.js 16 replacement for `middleware.ts`)
+- API routes verify auth via `createClient()` from `lib/supabase/server.ts`
+- Service-role operations use `createServiceClient()` (bypasses RLS, API routes only)
 - No registration wall - auth happens inline on the submit page
 
 ### Environment Variables

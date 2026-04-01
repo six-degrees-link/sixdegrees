@@ -216,7 +216,22 @@ Refine a plain-language requirement using Claude AI.
 1. Client calls Supabase `signInWithOtp({ email })`
 2. Supabase sends magic link to email
 3. User clicks link, redirected to `/auth/callback`
-4. Callback route exchanges code for session
-5. Session cookie set automatically by Supabase client
-6. All subsequent API requests include session cookie
-7. Server-side: `createRouteHandlerClient({ cookies })` to get auth user
+4. `app/auth/callback/route.ts` calls `supabase.auth.exchangeCodeForSession(code)`
+5. Session cookie set automatically by `@supabase/ssr`
+6. `proxy.ts` refreshes the session on every request
+7. All subsequent API requests include the session cookie
+
+**Server-side auth in Route Handlers** (`@supabase/ssr`, not the deprecated `@supabase/auth-helpers-nextjs`):
+
+```typescript
+import { createClient } from '@/lib/supabase/server'
+
+// In a Route Handler:
+const supabase = await createClient()
+const { data: { user } } = await supabase.auth.getUser()  // use getUser(), not getSession()
+if (!user) return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
+
+// For ai_usage_log inserts (RLS bypassed):
+import { createServiceClient } from '@/lib/supabase/server'
+const serviceSupabase = await createServiceClient()
+```

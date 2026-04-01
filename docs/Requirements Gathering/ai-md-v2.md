@@ -130,8 +130,7 @@ ${existingRequirements.map(r => `- ${r.refined_title}`).join('\n')}`;
 ```typescript
 // app/api/refine/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { anthropic } from '@/lib/claude/client';
 import { REFINEMENT_SYSTEM_PROMPT, REFINEMENT_USER_PROMPT } from '@/lib/claude/prompts';
 import { RefineRequestSchema } from '@/lib/validators/requirements';
@@ -139,10 +138,10 @@ import { parseRefinementResponse } from '@/lib/claude/parse';
 
 export async function POST(req: NextRequest) {
   // 1. Auth check
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return NextResponse.json(
       { error: 'Authentication required', code: 'UNAUTHORIZED' },
       { status: 401 }
@@ -161,8 +160,12 @@ export async function POST(req: NextRequest) {
 
   const { raw_input, persona_type, category } = parsed.data;
 
-  // 3. Check daily cost cap
-  const { data: dailyCost } = await supabase.rpc('get_daily_ai_cost');
+  // 3. Check daily cost cap (query directly — no get_daily_ai_cost() RPC)
+  const { data: usageRows } = await supabase
+    .from('ai_usage_log')
+    .select('cost_usd')
+    .gte('created_at', new Date().toISOString().split('T')[0]);
+  const dailyCost = (usageRows || []).reduce((sum, r) => sum + Number(r.cost_usd), 0);
   const cap = parseFloat(process.env.CLAUDE_DAILY_COST_CAP_USD || '10');
 
   if (dailyCost >= cap) {
@@ -218,10 +221,12 @@ export async function POST(req: NextRequest) {
     const outputTokens = message.usage.output_tokens;
     const costUsd = (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
 
-    await supabase.from('ai_usage_log').insert({
-      contributor_id: session.user.id,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
+    // Use service client for ai_usage_log (RLS bypassed — inserts are service-role only)
+    const serviceSupabase = await createServiceClient();
+    await serviceSupabase.from('ai_usage_log').insert({
+      contributor_id: user.id,
+      tokens_input: inputTokens,    // column is tokens_input, not input_tokens
+      tokens_output: outputTokens,  // column is tokens_output, not output_tokens
       model: 'claude-sonnet-4-20250514',
       cost_usd: costUsd,
     });
@@ -319,11 +324,11 @@ Two layers:
 Before calling Claude, query for similar requirements using `pg_trgm`:
 
 ```typescript
+// Note: no search_persona param — cross-persona duplicate detection is intentional
 const { data: similar } = await supabase.rpc('find_similar_requirements', {
   search_title: raw_input.slice(0, 200),
-  search_persona: persona_type,
   similarity_threshold: 0.3,
-  max_results: 10,
+  result_limit: 10,             // param is result_limit, not max_results
 });
 ```
 

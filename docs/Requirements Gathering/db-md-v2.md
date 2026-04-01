@@ -32,26 +32,11 @@ CREATE TYPE requirement_status AS ENUM (
 );
 
 CREATE TYPE vote_type AS ENUM ('up', 'down');
-
-CREATE TYPE feature_category AS ENUM (
-  'profile',
-  'messaging',
-  'search',
-  'jobs',
-  'content',
-  'networking',
-  'verification',
-  'admin',
-  'billing',
-  'notifications',
-  'analytics',
-  'microsites',
-  'moderation',
-  'other'
-);
-
-CREATE TYPE contributor_role AS ENUM ('contributor', 'moderator', 'admin');
 ```
+
+> **Note**: `feature_category` and `contributor_role` enums were planned but not implemented.
+> `category` is stored as `text` on the requirements table for flexibility.
+> Contributor roles are managed via the `ADMIN_EMAILS` environment variable.
 
 ## Tables
 
@@ -61,45 +46,17 @@ Maps to Supabase Auth users. Created on first login.
 
 ```sql
 CREATE TABLE contributors (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  role contributor_role DEFAULT 'contributor',
-  avatar_url TEXT,
-  bio TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  id           uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email        text        UNIQUE NOT NULL,
+  display_name text,
+  avatar_url   text,
+  verified     boolean     NOT NULL DEFAULT false,
+  created_at   timestamptz NOT NULL DEFAULT now()
 );
-
--- Trigger to auto-create contributor on signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.contributors (id, email)
-  VALUES (NEW.id, NEW.email);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
-
--- Auto-update updated_at
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER contributors_updated_at
-  BEFORE UPDATE ON contributors
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
 ```
+
+Auto-created on signup via trigger in `20260401000002_functions_triggers.sql`.
+`verified` flag is for future identity verification feature.
 
 ### requirements
 
@@ -107,68 +64,44 @@ The core table. Stores both the raw input and AI-refined output.
 
 ```sql
 CREATE TABLE requirements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contributor_id UUID NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
+  id                   uuid               NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  contributor_id       uuid               NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
+  raw_input            text               NOT NULL,
 
-  -- Raw input from contributor
-  raw_input TEXT NOT NULL,
-
-  -- AI-refined fields
-  refined_title TEXT,
-  user_story TEXT,                    -- "As a [persona], I want..."
-  refined_description TEXT,           -- Expanded description
-  acceptance_criteria JSONB DEFAULT '[]'::jsonb,  -- Array of strings
-  priority_suggestion TEXT,           -- "High", "Medium", "Low" with reasoning
-  tags JSONB DEFAULT '[]'::jsonb,     -- Array of tag strings
+  -- AI-refined fields (null until /api/refine is called)
+  refined_title        text,
+  user_story           text,              -- "As a [persona], I want..."
+  refined_description  text,
+  acceptance_criteria  jsonb              NOT NULL DEFAULT '[]'::jsonb,
+  priority_suggestion  text,
+  tags                 text[]             NOT NULL DEFAULT '{}',
 
   -- Classification
-  persona_type persona_type NOT NULL,
-  category feature_category DEFAULT 'other',
-  status requirement_status DEFAULT 'draft',
+  persona_type         persona_type,      -- nullable: set on submit, may be corrected by AI
+  category             text,              -- free text, not an enum
+  status               requirement_status NOT NULL DEFAULT 'draft',
 
-  -- Engagement metrics (denormalized for query performance)
-  upvotes INTEGER DEFAULT 0,
-  downvotes INTEGER DEFAULT 0,
-  comment_count INTEGER DEFAULT 0,
+  -- Engagement (denormalized, kept in sync by triggers)
+  upvotes              integer            NOT NULL DEFAULT 0,
+  downvotes            integer            NOT NULL DEFAULT 0,
+  comment_count        integer            NOT NULL DEFAULT 0,
 
-  -- Flags
-  is_flagged BOOLEAN DEFAULT false,
-  flag_reason TEXT,
-  merged_into UUID REFERENCES requirements(id),
-
-  -- Timestamps
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Indexes for common queries
-CREATE INDEX idx_requirements_persona ON requirements(persona_type);
-CREATE INDEX idx_requirements_category ON requirements(category);
-CREATE INDEX idx_requirements_status ON requirements(status);
-CREATE INDEX idx_requirements_upvotes ON requirements(upvotes DESC);
-CREATE INDEX idx_requirements_created ON requirements(created_at DESC);
-CREATE INDEX idx_requirements_contributor ON requirements(contributor_id);
-
--- Full-text search index
-ALTER TABLE requirements ADD COLUMN search_vector tsvector
-  GENERATED ALWAYS AS (
+  -- Full-text search (generated, weights: title A, user_story B, description C, raw D)
+  search_vector tsvector GENERATED ALWAYS AS (
     setweight(to_tsvector('english', coalesce(refined_title, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(raw_input, '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(refined_description, '')), 'C')
-  ) STORED;
+    setweight(to_tsvector('english', coalesce(user_story, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(refined_description, '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(raw_input, '')), 'D')
+  ) STORED,
 
-CREATE INDEX idx_requirements_search ON requirements USING GIN(search_vector);
-
--- Trigram similarity for duplicate detection
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE INDEX idx_requirements_title_trgm ON requirements USING GIN(refined_title gin_trgm_ops);
-
--- Updated_at trigger
-CREATE TRIGGER requirements_updated_at
-  BEFORE UPDATE ON requirements
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
+  created_at           timestamptz        NOT NULL DEFAULT now(),
+  updated_at           timestamptz        NOT NULL DEFAULT now()
+);
 ```
+
+Indexes: `status`, `persona_type`, `category`, `contributor_id`, `created_at DESC`, GIN on `search_vector`, GIN trigram on `refined_title`.
+
+> **Planned but not yet implemented**: `is_flagged`, `flag_reason`, `merged_into` columns are deferred to M4 moderation work.
 
 ### requirement_votes
 
@@ -193,37 +126,15 @@ CREATE INDEX idx_votes_contributor ON requirement_votes(contributor_id);
 
 ```sql
 CREATE TABLE requirement_comments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  requirement_id UUID NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
-  contributor_id UUID NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
-  body TEXT NOT NULL,
-  is_flagged BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_comments_requirement ON requirement_comments(requirement_id);
-
-CREATE TRIGGER comments_updated_at
-  BEFORE UPDATE ON requirement_comments
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
-```
-
-### persona_subscriptions
-
-For email notification preferences.
-
-```sql
-CREATE TABLE persona_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contributor_id UUID NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
-  persona_type persona_type NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-
-  UNIQUE(contributor_id, persona_type)
+  id             uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  requirement_id uuid        NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
+  contributor_id uuid        NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
+  body           text        NOT NULL,
+  created_at     timestamptz NOT NULL DEFAULT now()
 );
 ```
+
+> `is_flagged` and `updated_at` are deferred to M4 moderation work.
 
 ### ai_usage_log
 
@@ -231,204 +142,91 @@ Track Claude API costs.
 
 ```sql
 CREATE TABLE ai_usage_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contributor_id UUID NOT NULL REFERENCES contributors(id),
-  input_tokens INTEGER NOT NULL,
-  output_tokens INTEGER NOT NULL,
-  model TEXT NOT NULL,
-  cost_usd DECIMAL(10, 6),
-  created_at TIMESTAMPTZ DEFAULT now()
+  id             uuid           NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  contributor_id uuid           REFERENCES contributors(id) ON DELETE SET NULL,
+  requirement_id uuid           REFERENCES requirements(id) ON DELETE SET NULL,
+  model          text           NOT NULL,
+  tokens_input   integer        NOT NULL DEFAULT 0,
+  tokens_output  integer        NOT NULL DEFAULT 0,
+  cost_usd       numeric(10, 6) NOT NULL DEFAULT 0,
+  created_at     timestamptz    NOT NULL DEFAULT now()
 );
-
-CREATE INDEX idx_ai_usage_date ON ai_usage_log(created_at);
 ```
+
+> **Column names**: `tokens_input` / `tokens_output` (not `input_tokens` / `output_tokens`).
+> `requirement_id` FK added for per-requirement cost tracking.
+> `contributor_id` is nullable (SET NULL on contributor delete).
+
+> **Not yet implemented**: `persona_subscriptions` table (email notification preferences) is deferred to M4.
 
 ## Database Functions
 
-### Vote count sync
+Vote and comment counts use **increment/decrement triggers** (not full recounts) for performance.
+
+### Vote count triggers
+
+Insert: increments `upvotes` or `downvotes` by 1.
+Delete: decrements with `GREATEST(n - 1, 0)` floor to prevent negatives.
+See `20260401000002_functions_triggers.sql` for full implementation.
+
+### Comment count triggers
+
+Insert: increments `comment_count` by 1.
+Delete: decrements with `GREATEST(n - 1, 0)` floor.
+
+### `updated_at` trigger
+
+`handle_updated_at()` fires `BEFORE UPDATE` on `requirements` to keep `updated_at` current.
+
+### `handle_new_user()` trigger
+
+Fires `AFTER INSERT ON auth.users` — auto-creates a `contributors` row on signup.
+
+### find_similar_requirements
+
+Pre-AI duplicate detection using `pg_trgm` similarity:
 
 ```sql
-CREATE OR REPLACE FUNCTION sync_vote_counts()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF TG_OP = 'DELETE' THEN
-    UPDATE requirements SET
-      upvotes = (SELECT COUNT(*) FROM requirement_votes WHERE requirement_id = OLD.requirement_id AND vote_type = 'up'),
-      downvotes = (SELECT COUNT(*) FROM requirement_votes WHERE requirement_id = OLD.requirement_id AND vote_type = 'down')
-    WHERE id = OLD.requirement_id;
-    RETURN OLD;
-  ELSE
-    UPDATE requirements SET
-      upvotes = (SELECT COUNT(*) FROM requirement_votes WHERE requirement_id = NEW.requirement_id AND vote_type = 'up'),
-      downvotes = (SELECT COUNT(*) FROM requirement_votes WHERE requirement_id = NEW.requirement_id AND vote_type = 'down')
-    WHERE id = NEW.requirement_id;
-    RETURN NEW;
-  END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER on_vote_change
-  AFTER INSERT OR UPDATE OR DELETE ON requirement_votes
-  FOR EACH ROW
-  EXECUTE FUNCTION sync_vote_counts();
-```
-
-### Comment count sync
-
-```sql
-CREATE OR REPLACE FUNCTION sync_comment_count()
-RETURNS TRIGGER AS $$
-DECLARE
-  req_id UUID;
-BEGIN
-  req_id := COALESCE(NEW.requirement_id, OLD.requirement_id);
-  UPDATE requirements SET
-    comment_count = (SELECT COUNT(*) FROM requirement_comments WHERE requirement_id = req_id)
-  WHERE id = req_id;
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER on_comment_change
-  AFTER INSERT OR DELETE ON requirement_comments
-  FOR EACH ROW
-  EXECUTE FUNCTION sync_comment_count();
-```
-
-### Similar requirements search
-
-```sql
-CREATE OR REPLACE FUNCTION find_similar_requirements(
-  search_title TEXT,
-  search_persona persona_type,
-  similarity_threshold FLOAT DEFAULT 0.3,
-  max_results INTEGER DEFAULT 10
+-- Signature (actual implementation)
+find_similar_requirements(
+  search_title        text,
+  similarity_threshold float DEFAULT 0.3,
+  result_limit         integer DEFAULT 20
 )
-RETURNS TABLE (
-  id UUID,
-  refined_title TEXT,
-  similarity FLOAT
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    r.id,
-    r.refined_title,
-    similarity(r.refined_title, search_title) AS similarity
-  FROM requirements r
-  WHERE r.persona_type = search_persona
-    AND r.status IN ('submitted', 'approved', 'in_review')
-    AND r.refined_title IS NOT NULL
-    AND similarity(r.refined_title, search_title) > similarity_threshold
-  ORDER BY similarity DESC
-  LIMIT max_results;
-END;
-$$ LANGUAGE plpgsql;
+RETURNS TABLE (id uuid, refined_title text, status requirement_status, similarity float)
 ```
 
-### Daily AI cost check
+Called before the Claude API to surface potential duplicates.
+Returns requirements with similarity > threshold, excluding `rejected` ones.
 
-```sql
-CREATE OR REPLACE FUNCTION get_daily_ai_cost()
-RETURNS DECIMAL AS $$
-BEGIN
-  RETURN COALESCE(
-    (SELECT SUM(cost_usd) FROM ai_usage_log
-     WHERE created_at >= CURRENT_DATE),
-    0
-  );
-END;
-$$ LANGUAGE plpgsql;
-```
+> **Note**: There is no `search_persona` parameter (cross-persona duplicate detection is intentional).
+> There is no `get_daily_ai_cost()` DB function — daily cost is queried directly from `ai_usage_log` in the API route.
 
 ## Row Level Security Policies
 
-```sql
--- Enable RLS on all tables
-ALTER TABLE contributors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE requirements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE requirement_votes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE requirement_comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE persona_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_usage_log ENABLE ROW LEVEL SECURITY;
+All tables have RLS enabled. See `20260401000001_rls_policies.sql` for full SQL.
 
--- Contributors: read all, update own
-CREATE POLICY "Contributors are viewable by everyone"
-  ON contributors FOR SELECT USING (true);
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|-------|--------|--------|--------|--------|
+| `contributors` | Public | Via trigger only | Own row | — |
+| `requirements` | Public (approved/submitted/in_review) + own drafts | Own (`contributor_id = auth.uid()`) | Own drafts only | — |
+| `requirement_votes` | Public | Own (`contributor_id = auth.uid()`) | — | Own |
+| `requirement_comments` | On public requirements | Own, on public requirements | — | Own |
+| `ai_usage_log` | Own | Service role only (bypasses RLS) | — | — |
 
-CREATE POLICY "Contributors can update own profile"
-  ON contributors FOR UPDATE USING (auth.uid() = id);
-
--- Requirements: read all, create/update own
-CREATE POLICY "Requirements are viewable by everyone"
-  ON requirements FOR SELECT USING (true);
-
-CREATE POLICY "Authenticated users can create requirements"
-  ON requirements FOR INSERT WITH CHECK (auth.uid() = contributor_id);
-
-CREATE POLICY "Contributors can update own draft/submitted requirements"
-  ON requirements FOR UPDATE USING (
-    auth.uid() = contributor_id
-    AND status IN ('draft', 'submitted')
-  );
-
--- Admin override for requirements
-CREATE POLICY "Admins can update any requirement"
-  ON requirements FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM contributors
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
-
--- Votes: read all, manage own
-CREATE POLICY "Votes are viewable by everyone"
-  ON requirement_votes FOR SELECT USING (true);
-
-CREATE POLICY "Authenticated users can vote"
-  ON requirement_votes FOR INSERT WITH CHECK (auth.uid() = contributor_id);
-
-CREATE POLICY "Users can change own votes"
-  ON requirement_votes FOR UPDATE USING (auth.uid() = contributor_id);
-
-CREATE POLICY "Users can remove own votes"
-  ON requirement_votes FOR DELETE USING (auth.uid() = contributor_id);
-
--- Comments: read all, create authenticated, update/delete own
-CREATE POLICY "Comments are viewable by everyone"
-  ON requirement_comments FOR SELECT USING (true);
-
-CREATE POLICY "Authenticated users can comment"
-  ON requirement_comments FOR INSERT WITH CHECK (auth.uid() = contributor_id);
-
-CREATE POLICY "Users can update own comments"
-  ON requirement_comments FOR UPDATE USING (auth.uid() = contributor_id);
-
-CREATE POLICY "Users can delete own comments"
-  ON requirement_comments FOR DELETE USING (auth.uid() = contributor_id);
-
--- Subscriptions: own only
-CREATE POLICY "Users manage own subscriptions"
-  ON persona_subscriptions FOR ALL USING (auth.uid() = contributor_id);
-
--- AI usage: insert own, read for admins
-CREATE POLICY "Authenticated users can log AI usage"
-  ON ai_usage_log FOR INSERT WITH CHECK (auth.uid() = contributor_id);
-
-CREATE POLICY "Admins can view AI usage"
-  ON ai_usage_log FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM contributors
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
-```
+Key policy decisions:
+- Requirements in `draft` status are only visible to their author
+- Contributors can only edit their own requirements while still in `draft` status — status changes to `submitted`+ are admin-only (via service role)
+- AI usage inserts happen via `createServiceClient()` in API routes (service role bypasses RLS)
+- Admin moderation uses the service role key, not a DB-level `admin` role
 
 ## TypeScript Types
 
-Generate types from Supabase using:
+Types live at `lib/supabase/types.ts` (not `types/database.ts`).
+Regenerate after any schema change:
+
 ```bash
-npx supabase gen types typescript --project-id your-project-id > types/database.ts
+supabase gen types typescript --project-id fownudwjeugbnfuxvzch > lib/supabase/types.ts
 ```
 
 Key types for manual reference:
