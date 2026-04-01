@@ -1,11 +1,9 @@
+import { Navbar } from '@/components/navbar'
+
 export default function HomePage() {
   return (
     <div className="layout">
-      <header className="navbar" role="banner">
-        <a href="/" className="navbar__logo">
-          SixDegrees
-        </a>
-      </header>
+      <Navbar />
       <main className="home" id="main-content">
         <div className="hero">
           <h1 className="title">SixDegrees</h1>
