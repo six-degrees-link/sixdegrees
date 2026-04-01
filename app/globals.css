@@ -468,6 +468,221 @@ body {
 }
 
 /* ============================================================
+   Form extras (textarea, select, char count)
+   ============================================================ */
+
+.form-textarea {
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 0.5px solid var(--border-input);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.form-textarea::placeholder {
+  color: var(--text-disabled);
+}
+
+.form-textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.form-select {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  background: var(--bg-input);
+  border: 0.5px solid var(--border-input);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b6f76' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.form-select:focus {
+  border-color: var(--accent-primary);
+}
+
+.form-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.form-char-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+  display: block;
+  margin-top: 4px;
+}
+
+.form-char-count--warn {
+  color: #f59e0b;
+}
+
+.form-label--optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Page shell (interior pages)
+   ============================================================ */
+
+.page-content {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.page-header {
+  margin-bottom: 28px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+}
+
+.page-subtitle {
+  font-size: 15px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.6;
+  max-width: 52ch;
+}
+
+/* ============================================================
+   Submit page
+   ============================================================ */
+
+.submit-card {
+  max-width: 600px;
+}
+
+.submit-personas__hint {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  margin: 0 0 16px;
+}
+
+.persona-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.persona-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.persona-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.persona-card--selected {
+  border-color: var(--accent-primary);
+  background: rgba(130, 143, 255, 0.08);
+}
+
+.persona-card__label {
+  font-size: 13px;
+  font-weight: 510;
+  color: var(--text-primary);
+}
+
+.persona-card__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.submit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.submit-form__persona {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border: 1px solid var(--border-default);
+}
+
+.submit-form__persona-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.submit-form__persona-value {
+  font-size: 13px;
+  font-weight: 510;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.submit-form__persona-change {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.submit-form__persona-change:hover {
+  text-decoration: underline;
+}
+
+.submit-form__note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 16px 0 0;
+  line-height: 1.5;
+}
+
+/* ============================================================
    §5.9 Footer */
 .site-footer {
   flex-shrink: 0;
