@@ -12,7 +12,10 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'SixDegrees',
+  title: {
+    default: 'SixDegrees',
+    template: '%s — SixDegrees',
+  },
   description: 'The bot-free alternative to LinkedIn. Free, open source, every user verified.',
 }
 

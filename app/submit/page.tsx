@@ -5,7 +5,7 @@ import { Navbar } from '@/components/navbar'
 import { RequirementForm } from '@/components/submit/requirement-form'
 
 export const metadata: Metadata = {
-  title: 'Contribute a requirement — SixDegrees',
+  title: 'Contribute a requirement',
   description: 'Tell us what the platform needs to exist.',
 }
 

@@ -7,7 +7,7 @@ import { Navbar } from '@/components/navbar'
 import { AdminQueue } from '@/components/admin/admin-queue'
 
 export const metadata: Metadata = {
-  title: 'Admin — SixDegrees',
+  title: 'Admin',
 }
 
 const STATUS_COLOURS: Record<string, string> = {

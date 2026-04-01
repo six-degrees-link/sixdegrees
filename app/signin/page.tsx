@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { SignInForm } from '@/components/auth/sign-in-form'
 
 export const metadata: Metadata = {
-  title: 'Sign in — SixDegrees',
+  title: 'Sign in',
 }
 
 export default async function SignInPage() {

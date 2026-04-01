@@ -9,7 +9,7 @@ import { Pagination } from '@/components/browse/pagination'
 import { RequirementsQuerySchema } from '@/lib/validators/requirements'
 
 export const metadata: Metadata = {
-  title: 'Browse requirements — SixDegrees',
+  title: 'Browse requirements',
   description: 'Community-submitted requirements for the SixDegrees platform.',
 }
 
