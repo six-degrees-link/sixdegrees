@@ -84,9 +84,18 @@ export default async function BrowsePage({ searchParams }: PageProps) {
                 : 'No requirements match your filters'}
             </p>
           </div>
-          <Link href="/submit" className="btn btn--primary">
-            Contribute
-          </Link>
+          <div className="browse-header__actions">
+            <a
+              href="/api/export?format=csv&status=approved"
+              className="btn btn--ghost"
+              download
+            >
+              Export CSV
+            </a>
+            <Link href="/submit" className="btn btn--primary">
+              Contribute
+            </Link>
+          </div>
         </div>
 
         {/* Filter bar — wrapped in Suspense because it uses useSearchParams */}

@@ -94,14 +94,17 @@ CREATE TABLE requirements (
     setweight(to_tsvector('english', coalesce(raw_input, '')), 'D')
   ) STORED,
 
+  -- Moderation + deduplication (added M5)
+  merged_into          uuid,              -- FK → requirements(id), set when status = 'merged'
+  is_flagged           boolean            NOT NULL DEFAULT false,
+  flag_reason          text,
+
   created_at           timestamptz        NOT NULL DEFAULT now(),
   updated_at           timestamptz        NOT NULL DEFAULT now()
 );
 ```
 
-Indexes: `status`, `persona_type`, `category`, `contributor_id`, `created_at DESC`, GIN on `search_vector`, GIN trigram on `refined_title`.
-
-> **Planned but not yet implemented**: `is_flagged`, `flag_reason`, `merged_into` columns are deferred to M4 moderation work.
+Indexes: `status`, `persona_type`, `category`, `contributor_id`, `created_at DESC`, GIN on `search_vector`, GIN trigram on `refined_title`, partial on `merged_into` (non-null), partial on `is_flagged` (true).
 
 ### requirement_votes
 
@@ -130,11 +133,12 @@ CREATE TABLE requirement_comments (
   requirement_id uuid        NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
   contributor_id uuid        NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
   body           text        NOT NULL,
-  created_at     timestamptz NOT NULL DEFAULT now()
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),  -- set on edit; trigger fires BEFORE UPDATE
+  is_flagged     boolean     NOT NULL DEFAULT false,
+  flag_reason    text
 );
 ```
-
-> `is_flagged` and `updated_at` are deferred to M4 moderation work.
 
 ### ai_usage_log
 
@@ -157,7 +161,21 @@ CREATE TABLE ai_usage_log (
 > `requirement_id` FK added for per-requirement cost tracking.
 > `contributor_id` is nullable (SET NULL on contributor delete).
 
-> **Not yet implemented**: `persona_subscriptions` table (email notification preferences) is deferred to M4.
+### persona_subscriptions
+
+User subscriptions to persona types (for future email digests).
+
+```sql
+CREATE TABLE persona_subscriptions (
+  id             uuid         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  contributor_id uuid         NOT NULL REFERENCES contributors(id) ON DELETE CASCADE,
+  persona_type   persona_type NOT NULL,
+  created_at     timestamptz  NOT NULL DEFAULT now(),
+  UNIQUE (contributor_id, persona_type)
+);
+```
+
+RLS: users can only SELECT/INSERT/DELETE their own rows.
 
 ## Database Functions
 
@@ -176,7 +194,7 @@ Delete: decrements with `GREATEST(n - 1, 0)` floor.
 
 ### `updated_at` trigger
 
-`handle_updated_at()` fires `BEFORE UPDATE` on `requirements` to keep `updated_at` current.
+`handle_updated_at()` fires `BEFORE UPDATE` on `requirements` and `requirement_comments` to keep `updated_at` current.
 
 ### `handle_new_user()` trigger
 
@@ -254,20 +272,21 @@ export type RequirementStatus =
   | 'merged';
 
 export type FeatureCategory =
-  | 'profile'
-  | 'messaging'
-  | 'search'
-  | 'jobs'
-  | 'content'
-  | 'networking'
-  | 'verification'
+  | 'accessibility'
   | 'admin'
-  | 'billing'
-  | 'notifications'
   | 'analytics'
+  | 'billing'
+  | 'content'
+  | 'jobs'
+  | 'messaging'
   | 'microsites'
   | 'moderation'
-  | 'other';
+  | 'networking'
+  | 'notifications'
+  | 'profile'
+  | 'search'
+  | 'verification'
+  | 'other'; // alphabetical, 'other' always last
 
 export type VoteType = 'up' | 'down';
 
@@ -281,15 +300,15 @@ export interface Requirement {
   acceptance_criteria: string[];
   priority_suggestion: string | null;
   tags: string[];
-  persona_type: PersonaType;
-  category: FeatureCategory;
+  persona_type: PersonaType | null;
+  category: string | null;       // text column, not a DB enum
   status: RequirementStatus;
   upvotes: number;
   downvotes: number;
   comment_count: number;
   is_flagged: boolean;
   flag_reason: string | null;
-  merged_into: string | null;
+  merged_into: string | null;    // UUID of the requirement this was merged into
   created_at: string;
   updated_at: string;
 }
@@ -302,14 +321,14 @@ export interface RequirementWithContributor extends Requirement {
   };
 }
 
+// Actual columns — no role, bio, or updated_at on contributors
 export interface Contributor {
   id: string;
   email: string;
   display_name: string | null;
-  role: 'contributor' | 'moderator' | 'admin';
   avatar_url: string | null;
-  bio: string | null;
+  verified: boolean;             // reserved for future identity verification
   created_at: string;
-  updated_at: string;
+  // Admin status is NOT stored in DB — determined by ADMIN_EMAILS env var via isAdmin()
 }
 ```

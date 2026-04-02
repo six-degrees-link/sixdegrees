@@ -29,7 +29,7 @@ The output is a prioritized, community-validated product backlog for the SixDegr
 |-------|-----------|---------|
 | Framework | Next.js (App Router) | 16.2.2 |
 | Language | TypeScript | Strict mode |
-| Styling | Tailwind CSS v4 + CSS custom properties | 4.x |
+| Styling | Plain CSS custom properties (no Tailwind) | — |
 | Database | Supabase (PostgreSQL) | Latest |
 | Auth | Supabase Auth (magic links) | - |
 | AI | Anthropic Claude API | claude-sonnet-4-20250514 |
@@ -53,35 +53,54 @@ sixdegrees/
 │   │   └── error/page.tsx               # ✅ Auth error display
 │   ├── signin/page.tsx                   # ✅ Sign-in page (magic link form)
 │   ├── submit/page.tsx                   # ✅ 3-step requirement submission (auth required)
-│   ├── browse/page.tsx                   # ✅ Filter/search/paginate requirements (URL-driven, server-side)
-│   ├── requirements/[id]/page.tsx        # ✅ Requirement detail — voting, comments
+│   ├── browse/page.tsx                   # ✅ Filter/search/paginate requirements + Export CSV
+│   ├── requirements/[id]/page.tsx        # ✅ Requirement detail — voting, comments, flag
+│   ├── dashboard/page.tsx               # ✅ Persona + category coverage bar charts
+│   ├── leaderboard/page.tsx             # ✅ Top contributors by submissions + upvotes
 │   ├── admin/page.tsx                    # ✅ Admin moderation queue (isAdmin gated)
 │   └── api/
 │       ├── requirements/route.ts         # ✅ GET list + POST create
 │       ├── requirements/[id]/route.ts    # ✅ GET detail + PATCH owner update
 │       ├── requirements/[id]/vote/       # ✅ POST upsert + DELETE remove
 │       ├── requirements/[id]/comments/   # ✅ GET paginated + POST create
-│       ├── requirements/[id]/review/     # ✅ PATCH admin status transition
-│       └── refine/route.ts               # ✅ Claude AI refinement
+│       ├── requirements/[id]/comments/[commentId]/ # ✅ PATCH edit + DELETE own comment
+│       ├── requirements/[id]/comments/[commentId]/flag/ # ✅ POST flag comment
+│       ├── requirements/[id]/review/     # ✅ PATCH admin status transition (incl. merged)
+│       ├── requirements/[id]/flag/       # ✅ POST flag requirement
+│       ├── refine/route.ts               # ✅ Claude AI refinement
+│       ├── export/route.ts               # ✅ GET CSV/JSON export
+│       └── subscriptions/route.ts        # ✅ GET/POST/DELETE persona subscriptions
 ├── components/
 │   ├── navbar.tsx                        # ✅ Sticky navbar — Admin link for admin users only
 │   ├── navbar-user.tsx                   # ✅ Client sign-in/out state
 │   ├── admin/
 │   │   ├── admin-queue.tsx               # ✅ Sortable moderation table with optimistic updates
-│   │   └── review-actions.tsx            # ✅ Approve/Reject/In Review buttons
+│   │   ├── review-actions.tsx            # ✅ Approve/Reject/In Review/Merge buttons
+│   │   └── merge-dialog.tsx              # ✅ Live-search merge target dialog
+│   ├── browse/
+│   │   ├── filter-bar.tsx                # ✅ Search + filters
+│   │   ├── requirement-card.tsx          # ✅ Card used in browse grid
+│   │   └── pagination.tsx                # ✅ Pagination controls
+│   ├── requirements/
+│   │   ├── comment-section.tsx           # ✅ Comments with edit/delete/flag
+│   │   ├── vote-buttons.tsx              # ✅ Optimistic up/down vote UI
+│   │   └── flag-button.tsx               # ✅ Flag button (requirements + comments)
+│   ├── auth/
+│   │   └── sign-in-form.tsx              # ✅ Magic link sign-in form
 │   └── submit/
 │       └── requirement-form.tsx          # ✅ 3-step form with AI refinement
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts                     # ✅ createBrowserClient (@supabase/ssr, client components)
 │   │   ├── server.ts                     # ✅ createClient (anon SSR) + createServiceClient (sync, supabase-js direct)
-│   │   └── types.ts                      # ✅ Generated Supabase types
+│   │   └── types.ts                      # ✅ Generated Supabase types (updated M5)
 │   ├── claude/
 │   │   ├── client.ts                     # ✅ Anthropic SDK singleton
 │   │   ├── prompts.ts                    # ✅ REFINEMENT_SYSTEM_PROMPT + buildRefinementPrompt()
 │   │   └── parse.ts                      # ✅ parseRefinementResponse()
 │   ├── auth/
-│   │   └── admin.ts                      # ✅ isAdmin(user) — checks ADMIN_EMAILS env var
+│   │   ├── admin.ts                      # ✅ isAdmin(user) — checks ADMIN_EMAILS env var
+│   │   └── context.tsx                   # ✅ AuthProvider + useAuth() React context
 │   ├── validators/
 │   │   └── requirements.ts              # ✅ Zod schemas for all API inputs
 │   ├── constants/
@@ -90,9 +109,10 @@ sixdegrees/
 ├── scripts/
 │   └── seed-requirements.mjs            # ✅ Seeds 15 initial requirements (run once)
 ├── supabase/migrations/
-│   ├── 20260401000000_initial_schema.sql # ✅ Applied to production
-│   ├── 20260401000001_rls_policies.sql   # ✅ Applied to production
-│   └── 20260401000002_functions_triggers.sql # ✅ Applied to production
+│   ├── 20260401000000_initial_schema.sql   # ✅ Applied to production
+│   ├── 20260401000001_rls_policies.sql     # ✅ Applied to production
+│   ├── 20260401000002_functions_triggers.sql # ✅ Applied to production
+│   └── 20260402000000_m5_schema.sql        # ✅ M5 — merged_into, is_flagged, flag_reason, persona_subscriptions
 ├── docs/
 │   ├── build-progress.md                # ✅ Current build state, decisions, lessons learned
 │   └── Requirements Gathering/          # ✅ Planning docs (arch, api, db, design, personas, ai, frontend)
@@ -106,7 +126,7 @@ sixdegrees/
 └── package.json
 ```
 
-**Legend**: ✅ Built and deployed | 🔜 Planned (M5)
+**Legend**: ✅ Built and deployed
 
 > **Critical implementation notes** — see `docs/build-progress.md` for full details:
 > - `createServiceClient()` is **synchronous** — uses `@supabase/supabase-js` directly, not `@supabase/ssr`
@@ -140,7 +160,7 @@ sixdegrees/
 
 ### Authentication
 - Supabase magic links (email-only, no passwords)
-- Auth state managed via React context (`AuthProvider`) — 🔜 M2
+- Auth state managed via `AuthProvider` in `lib/auth/context.tsx` — use `useAuth()` in client components
 - Protected routes checked in `proxy.ts` (Next.js 16 replacement for `middleware.ts`)
 - API routes verify auth via `createClient()` from `lib/supabase/server.ts`
 - Service-role operations use `createServiceClient()` (bypasses RLS, API routes only)
@@ -160,7 +180,7 @@ CLAUDE_DAILY_COST_CAP_USD=10
 
 # App
 NEXT_PUBLIC_APP_URL=https://sixdegrees.link
-ADMIN_EMAILS=admin@sixdegrees.link
+ADMIN_EMAILS=admin@sixdegrees.link,sudo@sixdegrees.link
 ```
 
 ## Milestones
@@ -171,7 +191,7 @@ ADMIN_EMAILS=admin@sixdegrees.link
 | M2 | Requirements Website Live | Apr 27 | ✅ Landing, auth, submit, browse, requirement detail |
 | M3 | AI-Powered Refinement | May 11 | ✅ Claude integration, 3-step form, rate limiting |
 | M4 | Community Review | May 25 | ✅ Admin moderation queue, status transitions, approval email |
-| M5 | Consolidation and Export | Jun 30 | 🔜 Dedup, export, dashboard, leaderboard |
+| M5 | Consolidation and Export | Jun 30 | ✅ Dedup/merge, export, dashboard, leaderboard, flag flow, subscriptions, AuthProvider |
 
 ## Design Philosophy
 

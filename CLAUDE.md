@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-This repo currently contains the **landing/marketing site** for SixDegrees — a free, open-source professional network built to replace LinkedIn. The repo will grow to include the full requirements-gathering platform.
+This repo contains the **requirements gathering platform** for SixDegrees — a free, open-source professional network built to replace LinkedIn. Community members submit feature requests, Claude AI refines them into structured user stories, and the community votes and discusses them.
 
 **Mission**: Every user verified. No bots. No AI slop. No surveillance economy. No premium tier. The platform is yours.
 
@@ -25,57 +25,47 @@ This repo currently contains the **landing/marketing site** for SixDegrees — a
 
 ---
 
-## Current State (Landing Site)
+## Current State
 
-**Stack**: Vite + React (JSX), plain CSS, hosted on Vercel
+All 5 milestones complete as of 2026-04-02. The platform is fully built and live.
 
-```
-src/
-  App.jsx        # Root component — navbar, hero, manifesto, footer
-  main.jsx       # React entry point
-index.html
-vite.config.js
-```
-
-**Installed packages**:
-- `@vercel/analytics` — `<Analytics />` added to App.jsx
-- `@vercel/speed-insights` — `<SpeedInsights />` added to App.jsx
-
----
-
-## Planned Application: Requirements Gathering Platform
-
-The next major build is a **public requirements gathering tool** where community members submit feature requests, Claude AI refines them into structured user stories, and the community votes/discusses them.
-
-### Planned Stack
+**Stack**
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js App Router (TypeScript, strict mode) |
-| Styling | Tailwind CSS + CSS custom properties |
+| Framework | Next.js 16 App Router (TypeScript, strict mode) |
+| Styling | Plain CSS custom properties (no Tailwind) |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth — magic links only (no passwords) |
 | AI | Anthropic Claude API (`claude-sonnet-4-20250514`) |
 | Icons | Lucide Icons |
 | Validation | Zod |
 | Font | Inter Variable |
+| Email | Resend |
+| Analytics | `@vercel/analytics`, `@vercel/speed-insights`, Google Tag Manager |
 
-### Key Routes (planned)
-- `/` — landing page
-- `/submit` — requirement submission form with AI refinement
-- `/browse` — browse/filter/search requirements
-- `/requirements/[id]` — detail view with voting and comments
-- `/dashboard` — persona coverage dashboard
-- `/leaderboard` — contributor leaderboard
-- `/admin` — moderation tools (admin-only)
+**Pages**
+- `/` — landing page (Server Component)
+- `/signin` — magic link sign-in
+- `/submit` — 3-step requirement submission form with AI refinement
+- `/browse` — filterable, searchable, paginated requirements list (URL-driven, server-side)
+- `/requirements/[id]` — full requirement detail with voting and comments
+- `/dashboard` — persona + category coverage bar charts
+- `/leaderboard` — top contributors by submissions and upvotes
+- `/admin` — moderation queue (admin-gated)
 
-### API Routes (planned)
+**API Routes**
 - `POST /api/refine` — Claude AI refinement (auth required)
-- `GET/POST /api/requirements` — list and create
-- `GET/PATCH /api/requirements/[id]` — detail and update
-- `POST/DELETE /api/requirements/[id]/vote` — voting
-- `GET/POST /api/requirements/[id]/comments`
-- `GET /api/requirements/stats` — dashboard stats
+- `GET/POST /api/requirements` — list with filters/pagination; create
+- `GET/PATCH /api/requirements/[id]` — detail + user vote; owner update
+- `POST/DELETE /api/requirements/[id]/vote` — upsert/remove vote
+- `GET/POST /api/requirements/[id]/comments` — paginated; post (auth required)
+- `PATCH/DELETE /api/requirements/[id]/comments/[commentId]` — edit/delete own comment
+- `POST /api/requirements/[id]/comments/[commentId]/flag` — flag comment
+- `PATCH /api/requirements/[id]/review` — admin status transition (incl. merge)
+- `POST /api/requirements/[id]/flag` — flag requirement
+- `GET /api/export` — download requirements as CSV or JSON (`?format=csv|json&status=approved`)
+- `GET/POST/DELETE /api/subscriptions` — persona subscriptions
 
 ---
 
@@ -89,6 +79,7 @@ Claude is used to transform plain-language feature requests into structured user
 - **Daily cost cap**: `CLAUDE_DAILY_COST_CAP_USD` env var (default $10)
 - **Fallback**: when AI unavailable, submit with raw input only (status: `draft`)
 - **Cost**: ~$0.011/refinement → ~900 refinements/day at $10 cap
+- **Rate limit**: 10 refinements/user/hour (checked against `ai_usage_log`)
 
 Claude returns structured JSON with: `refined_title`, `user_story`, `refined_description`, `acceptance_criteria`, `persona_type`, `category`, `priority_suggestion`, `tags`, `clarifications_needed`, `similar_existing_titles`
 
@@ -118,13 +109,15 @@ Duplicate detection uses two layers:
 
 ## Feature Categories
 
-`profile`, `messaging`, `search`, `jobs`, `content`, `networking`, `verification`, `admin`, `billing`, `notifications`, `analytics`, `microsites`, `moderation`, `other`
+Alphabetical, `other` always last:
+
+`accessibility`, `admin`, `analytics`, `billing`, `content`, `jobs`, `messaging`, `microsites`, `moderation`, `networking`, `notifications`, `profile`, `search`, `verification`, `other`
 
 ---
 
 ## Database (Supabase/PostgreSQL)
 
-Key tables: `contributors`, `requirements`, `requirement_votes`, `requirement_comments`, `persona_subscriptions`, `ai_usage_log`
+Tables: `contributors`, `requirements`, `requirement_votes`, `requirement_comments`, `persona_subscriptions`, `ai_usage_log`
 
 - RLS enabled on all tables
 - Auth via Supabase Auth — contributor created automatically on first login via trigger
@@ -132,7 +125,18 @@ Key tables: `contributors`, `requirements`, `requirement_votes`, `requirement_co
 - Full-text search via `tsvector` generated column + GIN index
 - Duplicate detection via `pg_trgm` similarity + `find_similar_requirements()` function
 
-Requirement status flow: `draft` → `submitted` → `in_review` → `approved` / `rejected` / `merged`
+**Requirement status flow**: `draft` → `submitted` → `in_review` → `approved` / `rejected` / `merged`
+
+**Status transitions**:
+```
+submitted  → in_review, approved, rejected, merged
+in_review  → approved, rejected, merged
+approved   → rejected, merged
+rejected   → in_review, approved
+draft      → submitted, in_review, approved, rejected
+```
+
+When merging: `merged_into` UUID must be provided. Set alongside `status = merged`.
 
 ---
 
@@ -180,10 +184,15 @@ Requirement status flow: `draft` → `submitted` → `in_review` → `approved` 
 - API responses: `{ data?: T, error?: string, code?: string }`
 - Components: PascalCase | Hooks: camelCase `use` prefix | DB columns: snake_case
 - Error: toast for user-facing, `console.error` + structured response for API
+- Service client (`createServiceClient()`) is **synchronous** — no `await` at call sites
+- Admin routes: anon client for identity check, service client for DB writes (bypasses RLS)
+- AuthProvider (`lib/auth/context.tsx`) wraps root layout — use `useAuth()` in client components for user state
 
 ---
 
-## Environment Variables (planned)
+## Environment Variables
+
+All set in Vercel + `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
@@ -192,17 +201,21 @@ SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
 CLAUDE_DAILY_COST_CAP_USD=10
 NEXT_PUBLIC_APP_URL=https://sixdegrees.link
-ADMIN_EMAILS=admin@sixdegrees.link
+ADMIN_EMAILS=admin@sixdegrees.link,sudo@sixdegrees.link
+RESEND_API_KEY
+EMAIL_FROM=noreply@sixdegrees.link
 ```
 
 ---
 
 ## Milestones
 
-| # | Name | Target |
+All complete.
+
+| # | Name | Status |
 |---|------|--------|
-| M1 | Foundation & Setup | Apr 13, 2026 |
-| M2 | Requirements Website Live | Apr 27, 2026 |
-| M3 | AI-Powered Refinement | May 11, 2026 |
-| M4 | Community Review | May 25, 2026 |
-| M5 | Consolidation & Export | Jun 30, 2026 |
+| M1 | Foundation & Setup | ✅ |
+| M2 | Requirements Website Live | ✅ |
+| M3 | AI-Powered Refinement | ✅ |
+| M4 | Community Review (Admin Moderation) | ✅ |
+| M5 | Consolidation & Export | ✅ |

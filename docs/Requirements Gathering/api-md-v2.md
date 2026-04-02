@@ -52,10 +52,10 @@ export const PersonaTypeSchema = z.enum([
 ]);
 
 export const FeatureCategorySchema = z.enum([
-  'profile', 'messaging', 'search', 'jobs', 'content',
-  'networking', 'verification', 'admin', 'billing',
-  'notifications', 'analytics', 'microsites', 'moderation', 'other'
-]);
+  'accessibility', 'admin', 'analytics', 'billing', 'content',
+  'jobs', 'messaging', 'microsites', 'moderation', 'networking',
+  'notifications', 'profile', 'search', 'verification', 'other'
+]); // alphabetical, 'other' always last
 
 export const CreateRequirementSchema = z.object({
   raw_input: z.string().min(10).max(5000),
@@ -118,7 +118,7 @@ List requirements with filtering and pagination.
 - **Auth**: Not required
 - **Query Parameters**: persona_type, category, status, sort (votes|newest|oldest), search, page, limit
 - **Response** (200): Array of requirements with contributor info, vote counts, comment counts, and pagination meta
-- **Notes**: When `search` is provided, use PostgreSQL full-text search on `search_vector`. When `sort=votes`, order by `(upvotes - downvotes) DESC`. Exclude `merged` and `rejected` from default listing unless status filter explicitly set.
+- **Notes**: When `search` is provided, uses PostgreSQL `websearch` full-text search on `search_vector`. When `sort=votes`, orders by `upvotes DESC`. Default listing excludes `draft`, `rejected`, and `merged` unless status filter explicitly set.
 
 ---
 
@@ -138,15 +138,6 @@ Update a requirement (owner only, draft/submitted status only).
 - **Auth**: Required (must be owner)
 - **Body** (UpdateRequirementSchema): Any subset of requirement fields
 - **Response** (200): Updated requirement object
-
----
-
-### GET /api/requirements/stats
-
-Dashboard statistics.
-
-- **Auth**: Not required
-- **Response** (200): total_requirements, total_contributors, total_votes, by_persona counts, by_category counts, by_status counts, top_voted list, recent_activity feed
 
 ---
 
@@ -187,6 +178,95 @@ Add a comment.
 - **Auth**: Required
 - **Body**: `{ "body": "Comment text..." }`
 - **Response** (201): Created comment object
+
+---
+
+### PATCH /api/requirements/[id]/comments/[commentId]
+
+Edit own comment.
+
+- **Auth**: Required (must be comment author)
+- **Body**: `{ "body": "Updated text..." }`
+- **Response** (200): Updated comment object
+
+---
+
+### DELETE /api/requirements/[id]/comments/[commentId]
+
+Delete own comment.
+
+- **Auth**: Required (must be comment author)
+- **Response** (204): No content
+
+---
+
+### POST /api/requirements/[id]/flag
+
+Flag a requirement for admin review.
+
+- **Auth**: Required
+- **Body**: `{ "reason": "optional reason string" }` (reason optional)
+- **Response** (200): `{ "data": { "flagged": true } }`
+
+---
+
+### POST /api/requirements/[id]/comments/[commentId]/flag
+
+Flag a comment for admin review.
+
+- **Auth**: Required
+- **Body**: `{ "reason": "optional reason string" }` (reason optional)
+- **Response** (200): `{ "data": { "flagged": true } }`
+
+---
+
+### PATCH /api/requirements/[id]/review
+
+Admin status transition.
+
+- **Auth**: Required (admin only)
+- **Body**: `{ "status": "in_review" | "approved" | "rejected" | "merged", "merged_into": "uuid" }`
+- **Notes**: `merged_into` is required when `status = "merged"`. Valid transitions: submitted/in_review/approved → merged; see status flow in CLAUDE.md.
+
+---
+
+### GET /api/export
+
+Export approved requirements as CSV or JSON.
+
+- **Auth**: Not required
+- **Query**: `format=csv|json` (default: json), `status=approved|submitted|in_review|all` (default: approved)
+- **Response**: File download with appropriate Content-Type and Content-Disposition headers
+
+---
+
+### GET /api/subscriptions
+
+List current user's persona subscriptions.
+
+- **Auth**: Required
+- **Response** (200): Array of `{ id, persona_type, created_at }`
+
+---
+
+### POST /api/subscriptions
+
+Subscribe to a persona type.
+
+- **Auth**: Required
+- **Body**: `{ "persona_type": PersonaType }`
+- **Response** (201): Created subscription object
+- **Notes**: 409 if already subscribed
+
+---
+
+### DELETE /api/subscriptions
+
+Unsubscribe from a persona type.
+
+- **Auth**: Required
+- **Query**: `?persona_type=general_user` (etc.)
+- **Response** (204): No content
 
 ---
 
@@ -231,7 +311,7 @@ const supabase = await createClient()
 const { data: { user } } = await supabase.auth.getUser()  // use getUser(), not getSession()
 if (!user) return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
 
-// For ai_usage_log inserts (RLS bypassed):
+// For ai_usage_log inserts and admin ops (RLS bypassed):
 import { createServiceClient } from '@/lib/supabase/server'
-const serviceSupabase = await createServiceClient()
+const serviceSupabase = createServiceClient()  // synchronous — no await
 ```

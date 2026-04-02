@@ -89,27 +89,65 @@ export type Database = {
         }
         Relationships: []
       }
+      persona_subscriptions: {
+        Row: {
+          contributor_id: string
+          created_at: string
+          id: string
+          persona_type: Database["public"]["Enums"]["persona_type"]
+        }
+        Insert: {
+          contributor_id: string
+          created_at?: string
+          id?: string
+          persona_type: Database["public"]["Enums"]["persona_type"]
+        }
+        Update: {
+          contributor_id?: string
+          created_at?: string
+          id?: string
+          persona_type?: Database["public"]["Enums"]["persona_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_subscriptions_contributor_id_fkey"
+            columns: ["contributor_id"]
+            isOneToOne: false
+            referencedRelation: "contributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       requirement_comments: {
         Row: {
           body: string
           contributor_id: string
           created_at: string
+          flag_reason: string | null
           id: string
+          is_flagged: boolean
           requirement_id: string
+          updated_at: string
         }
         Insert: {
           body: string
           contributor_id: string
           created_at?: string
+          flag_reason?: string | null
           id?: string
+          is_flagged?: boolean
           requirement_id: string
+          updated_at?: string
         }
         Update: {
           body?: string
           contributor_id?: string
           created_at?: string
+          flag_reason?: string | null
           id?: string
+          is_flagged?: boolean
           requirement_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -175,7 +213,10 @@ export type Database = {
           contributor_id: string
           created_at: string
           downvotes: number
+          flag_reason: string | null
           id: string
+          is_flagged: boolean
+          merged_into: string | null
           persona_type: Database["public"]["Enums"]["persona_type"] | null
           priority_suggestion: string | null
           raw_input: string
@@ -195,7 +236,10 @@ export type Database = {
           contributor_id: string
           created_at?: string
           downvotes?: number
+          flag_reason?: string | null
           id?: string
+          is_flagged?: boolean
+          merged_into?: string | null
           persona_type?: Database["public"]["Enums"]["persona_type"] | null
           priority_suggestion?: string | null
           raw_input: string
@@ -215,7 +259,10 @@ export type Database = {
           contributor_id?: string
           created_at?: string
           downvotes?: number
+          flag_reason?: string | null
           id?: string
+          is_flagged?: boolean
+          merged_into?: string | null
           persona_type?: Database["public"]["Enums"]["persona_type"] | null
           priority_suggestion?: string | null
           raw_input?: string
@@ -234,6 +281,13 @@ export type Database = {
             columns: ["contributor_id"]
             isOneToOne: false
             referencedRelation: "contributors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirements_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "requirements"
             referencedColumns: ["id"]
           },
         ]

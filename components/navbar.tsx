@@ -23,6 +23,12 @@ export async function Navbar() {
             <Link href="/submit" className="navbar__link">
               Contribute
             </Link>
+            <Link href="/dashboard" className="navbar__link">
+              Dashboard
+            </Link>
+            <Link href="/leaderboard" className="navbar__link">
+              Leaderboard
+            </Link>
             {isAdmin(user) && (
               <Link href="/admin" className="navbar__link navbar__link--admin">
                 Admin

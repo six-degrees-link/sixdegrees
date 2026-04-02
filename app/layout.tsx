@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { AuthProvider } from '@/lib/auth/context'
 import './globals.css'
 
 const inter = Inter({
@@ -37,7 +38,7 @@ export default function RootLayout({
             style={{ display: 'none', visibility: 'hidden' }}
           />
         </noscript>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <Analytics />
         <SpeedInsights />
         {/* Google Tag Manager */}

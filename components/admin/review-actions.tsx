@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Loader2, Merge } from 'lucide-react'
+import { MergeDialog } from './merge-dialog'
 
 type Status = 'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'merged'
 
@@ -20,12 +21,17 @@ const TRANSITIONS: Record<Status, { value: Status; label: string }[]> = {
   merged:     [],
 }
 
+const MERGEABLE: Status[] = ['submitted', 'in_review', 'approved']
+
 export function ReviewActions({ requirementId, currentStatus, onStatusChange }: Props) {
   const [loading, setLoading] = useState<Status | null>(null)
   const [error, setError] = useState('')
+  const [showMerge, setShowMerge] = useState(false)
 
   const actions = TRANSITIONS[currentStatus] ?? []
-  if (actions.length === 0) return <span className="review-actions__done">—</span>
+  const canMerge = MERGEABLE.includes(currentStatus)
+
+  if (actions.length === 0 && !canMerge) return <span className="review-actions__done">—</span>
 
   async function handleAction(newStatus: Status) {
     setLoading(newStatus)
@@ -48,29 +54,51 @@ export function ReviewActions({ requirementId, currentStatus, onStatusChange }: 
   }
 
   return (
-    <div className="review-actions">
-      {actions.map((action) => (
-        <button
-          key={action.value}
-          type="button"
-          className={`review-btn review-btn--${action.value}`}
-          onClick={() => handleAction(action.value)}
-          disabled={loading !== null}
-          title={action.label}
-        >
-          {loading === action.value ? (
-            <Loader2 size={13} strokeWidth={1.5} className="spin" />
-          ) : action.value === 'approved' ? (
-            <CheckCircle size={13} strokeWidth={1.5} />
-          ) : action.value === 'rejected' ? (
-            <XCircle size={13} strokeWidth={1.5} />
-          ) : (
-            <Clock size={13} strokeWidth={1.5} />
-          )}
-          {action.label}
-        </button>
-      ))}
-      {error && <span className="review-actions__error">{error}</span>}
-    </div>
+    <>
+      <div className="review-actions">
+        {actions.map((action) => (
+          <button
+            key={action.value}
+            type="button"
+            className={`review-btn review-btn--${action.value}`}
+            onClick={() => handleAction(action.value)}
+            disabled={loading !== null}
+            title={action.label}
+          >
+            {loading === action.value ? (
+              <Loader2 size={13} strokeWidth={1.5} className="spin" />
+            ) : action.value === 'approved' ? (
+              <CheckCircle size={13} strokeWidth={1.5} />
+            ) : action.value === 'rejected' ? (
+              <XCircle size={13} strokeWidth={1.5} />
+            ) : (
+              <Clock size={13} strokeWidth={1.5} />
+            )}
+            {action.label}
+          </button>
+        ))}
+        {canMerge && (
+          <button
+            type="button"
+            className="review-btn review-btn--merged"
+            onClick={() => setShowMerge(true)}
+            disabled={loading !== null}
+            title="Merge into another requirement"
+          >
+            <Merge size={13} strokeWidth={1.5} />
+            Merge
+          </button>
+        )}
+        {error && <span className="review-actions__error">{error}</span>}
+      </div>
+
+      {showMerge && (
+        <MergeDialog
+          requirementId={requirementId}
+          onMerged={(id) => onStatusChange(id, 'merged')}
+          onClose={() => setShowMerge(false)}
+        />
+      )}
+    </>
   )
 }

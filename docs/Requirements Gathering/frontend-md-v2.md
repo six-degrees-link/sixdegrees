@@ -18,7 +18,7 @@ See DESIGN_SYSTEM.md for all CSS tokens, component specs, and typography.
 
 **Sections** (top to bottom):
 
-1. **Navbar** (sticky) - Logo "SixDegrees" (16px, weight 590), nav links (Browse, Dashboard, Leaderboard), auth state, CTA "Contribute" (primary button, small)
+1. **Navbar** (sticky) - Logo "SixDegrees" (16px, weight 590), nav links (Browse, Contribute, Dashboard, Leaderboard, Admin [admin only]), auth state (sign in link or email + sign out)
 
 2. **Hero** - Manifesto-inspired headline (64px, weight 510, letter-spacing -1.408px). Subtitle (16px, tertiary). Two CTAs: "Contribute a Requirement" (primary) and "Browse Requirements" (secondary).
 
@@ -26,9 +26,9 @@ See DESIGN_SYSTEM.md for all CSS tokens, component specs, and typography.
 
 4. **Personas Grid** - 2x5 or 3-column grid of cards. Each card: persona name, short description, requirement count badge. Click links to /browse?persona_type=X.
 
-5. **Live Stats Bar** - "X Requirements", "X Contributors", "X Votes". Fetched from /api/requirements/stats.
+5. **Footer** - 4-column grid: Product, Community, Resources, Connect.
 
-6. **Footer** - 4-column grid: Product, Community, Resources, Connect.
+> **Note**: There is no `/api/requirements/stats` endpoint. Dashboard stats are queried directly in Server Components.
 
 ---
 
@@ -107,23 +107,22 @@ SubmitPage
 ### 5. Dashboard (`/dashboard`)
 
 **Sections**:
-1. Stats cards: total requirements, contributors, votes
-2. Persona coverage grid: 11 cards with count and color coding (Green >20, Yellow 5-20, Red <5)
-3. Category breakdown: horizontal bar chart
-4. Top 10 most voted: ranked list
-5. Recent activity: latest submissions and comments
+1. Persona coverage — 11 rows, each with label, count, and proportional bar chart. Links to `/browse?persona_type=X`. Bars scale relative to the highest persona count.
+2. Category coverage — 15 rows, same bar chart pattern. Links to `/browse?category=X`.
+
+**Notes**: No stats cards or live stats bar. No color-coded thresholds. Data queried server-side from `requirements` table (approved + in_review + submitted). Server Component, no API route.
 
 ---
 
 ### 6. Leaderboard (`/leaderboard`)
 
-Time filter (All Time, This Month, This Week as pill tabs). Ranked table: Rank, Contributor, Requirements, Votes Cast, Comments. Achievement badges per contributor. Top 3 highlighted with larger cards.
+Ranked table with columns: Rank (emoji medal for top 3), Contributor, Requirements (with bar), Upvotes received (with bar), Joined date. Sorted by submission count, then upvotes as tiebreak. No time filter, no achievement badges. Server Component — data aggregated from `requirements` joined to `contributors`.
 
 ---
 
 ### 7. Admin (`/admin`)
 
-Admin-only (role = 'admin'). Flagged requirements queue, flagged comments queue, actions (Approve, Reject, Duplicate, Merge), bulk deduplication trigger, AI usage dashboard.
+Admin-only (checked via `isAdmin(user)` against `ADMIN_EMAILS` env var). Status stats bar (all 6 states). Pending review queue (submitted + in_review). Sortable table with optimistic status updates, Review Actions (Approve / Reject / In Review / Merge). Merge opens `MergeDialog` — live search to find the canonical requirement. No bulk actions, no AI usage dashboard.
 
 ---
 

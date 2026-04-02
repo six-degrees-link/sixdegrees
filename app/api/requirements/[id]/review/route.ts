@@ -7,13 +7,14 @@ import { sendRequirementApproved } from '@/lib/email'
 type Params = { params: Promise<{ id: string }> }
 
 const ReviewSchema = z.object({
-  status: z.enum(['in_review', 'approved', 'rejected']),
+  status: z.enum(['in_review', 'approved', 'rejected', 'merged']),
+  merged_into: z.string().uuid().optional(),
 })
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  submitted:  ['in_review', 'approved', 'rejected'],
-  in_review:  ['approved', 'rejected'],
-  approved:   ['rejected'],
+  submitted:  ['in_review', 'approved', 'rejected', 'merged'],
+  in_review:  ['approved', 'rejected', 'merged'],
+  approved:   ['rejected', 'merged'],
   rejected:   ['in_review', 'approved'],
   draft:      ['submitted', 'in_review', 'approved', 'rejected'],
 }
@@ -53,7 +54,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     )
   }
 
-  const { status: newStatus } = parsed.data
+  const { status: newStatus, merged_into } = parsed.data
+
+  if (newStatus === 'merged' && !merged_into) {
+    return NextResponse.json(
+      { error: 'merged_into is required when merging', code: 'VALIDATION_ERROR' },
+      { status: 400 }
+    )
+  }
 
   // Use service client for all DB writes — RLS would block admins updating others' requirements
   const service = createServiceClient()
@@ -80,12 +88,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     )
   }
 
-  // Update status
+  // Update status (and merged_into if merging)
+  const updatePayload: Record<string, unknown> = { status: newStatus }
+  if (newStatus === 'merged' && merged_into) updatePayload.merged_into = merged_into
+
   const { data: rows, error } = await service
     .from('requirements')
-    .update({ status: newStatus })
+    .update(updatePayload)
     .eq('id', id)
-    .select('id, status, refined_title, raw_input')
+    .select('id, status, refined_title, raw_input, merged_into')
 
   if (error || !rows || rows.length === 0) {
     console.error('Review update failed:', JSON.stringify(error))

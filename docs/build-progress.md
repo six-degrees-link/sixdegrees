@@ -1,7 +1,7 @@
 # SixDegrees — Build Progress
 
-**Last updated**: 2026-04-01
-**Current milestone**: M4 complete, M5 next
+**Last updated**: 2026-04-02
+**Current milestone**: M5 complete
 **Live at**: https://sixdegrees.link
 **Repo**: https://github.com/six-degrees-link/sixdegrees
 
@@ -15,7 +15,7 @@
 | M2 | Requirements Website Live | Apr 27 | ✅ Complete |
 | M3 | AI-Powered Refinement | May 11 | ✅ Complete |
 | M4 | Community Review (Admin Moderation) | May 25 | ✅ Complete |
-| M5 | Consolidation & Export | Jun 30 | 🔜 Not started |
+| M5 | Consolidation & Export | Jun 30 | ✅ Complete |
 
 ---
 
@@ -94,6 +94,28 @@
 submitted  → in_review, approved, rejected
 in_review  → approved, rejected
 approved   → rejected
+rejected   → in_review, approved
+draft      → submitted, in_review, approved, rejected
+```
+
+### M5 — Consolidation & Export
+
+- **DB migration** `20260402000000_m5_schema.sql` — `merged_into` FK, `is_flagged`/`flag_reason` on requirements and comments, `updated_at` on comments, `persona_subscriptions` table with RLS
+- **AuthProvider** (`lib/auth/context.tsx`) — React context with `useAuth()` hook; wraps root layout
+- **Comment edit/delete** — `PATCH/DELETE /api/requirements/[id]/comments/[commentId]`; `CommentSection` shows Edit/Delete for own comments, Flag for others
+- **Leaderboard** (`/leaderboard`) — top contributors by approved submissions + upvotes received, with inline bar charts
+- **Dashboard** (`/dashboard`) — persona coverage + category coverage bar charts, links to filtered browse
+- **Deduplication/merge** — `PATCH /api/requirements/[id]/review` extended with `status=merged` + `merged_into`; `MergeDialog` component with live search in admin queue; `review-actions.tsx` updated
+- **Export** (`GET /api/export?format=csv|json&status=approved`) — full requirements export; Export CSV button on browse page
+- **Flag flow** — `POST /api/requirements/[id]/flag` and `POST /api/requirements/[id]/comments/[commentId]/flag`; flag button in requirement sidebar and on comments (non-owners)
+- **Persona subscriptions** — `persona_subscriptions` table; `GET/POST/DELETE /api/subscriptions`
+- **Navbar** — added Dashboard and Leaderboard links
+
+**Updated status transition rules (now includes merged)**:
+```
+submitted  → in_review, approved, rejected, merged
+in_review  → approved, rejected, merged
+approved   → rejected, merged
 rejected   → in_review, approved
 draft      → submitted, in_review, approved, rejected
 ```
@@ -183,9 +205,9 @@ const updated = rows?.[0]
 
 ```
 app/
-  layout.tsx                      ✅ Root layout — Inter font, GTM, Analytics, metadata template
+  layout.tsx                      ✅ Root layout — Inter font, GTM, Analytics, AuthProvider
   page.tsx                        ✅ Landing page
-  globals.css                     ✅ Design system tokens
+  globals.css                     ✅ Design system tokens + all component styles
   proxy.ts                        ✅ Supabase session refresh middleware
   auth/
     callback/route.ts             ✅ Magic link code exchange
@@ -193,37 +215,56 @@ app/
     error/page.tsx                ✅ Auth error page
   signin/page.tsx                 ✅ Sign-in page
   submit/page.tsx                 ✅ Submit requirement (3-step form with AI)
-  browse/page.tsx                 ✅ Browse with URL-driven filters, search, pagination
-  requirements/[id]/page.tsx      ✅ Requirement detail — voting, comments
+  browse/page.tsx                 ✅ Browse with URL-driven filters, search, pagination + Export CSV
+  requirements/[id]/page.tsx      ✅ Requirement detail — voting, comments, flag
+  dashboard/page.tsx              ✅ Persona + category coverage bar charts
+  leaderboard/page.tsx            ✅ Top contributors by submissions + upvotes
   admin/page.tsx                  ✅ Admin moderation queue (admin-gated)
   api/
     requirements/route.ts         ✅ GET list + POST create
     requirements/[id]/route.ts    ✅ GET detail + PATCH owner update
     requirements/[id]/vote/       ✅ POST upsert + DELETE remove vote
     requirements/[id]/comments/   ✅ GET paginated + POST create
-    requirements/[id]/review/     ✅ PATCH admin status transition
+    requirements/[id]/comments/[commentId]/ ✅ PATCH edit + DELETE own comment
+    requirements/[id]/comments/[commentId]/flag/ ✅ POST flag comment
+    requirements/[id]/review/     ✅ PATCH admin status transition (incl. merged + merged_into)
+    requirements/[id]/flag/       ✅ POST flag requirement
     refine/route.ts               ✅ Claude AI refinement
+    export/route.ts               ✅ GET CSV/JSON export (?format=csv|json&status=approved)
+    subscriptions/route.ts        ✅ GET/POST/DELETE persona subscriptions
 
 components/
-  navbar.tsx                      ✅ Sticky navbar with admin link
+  navbar.tsx                      ✅ Sticky navbar — Browse, Contribute, Dashboard, Leaderboard, Admin
   navbar-user.tsx                 ✅ Client sign-in/out state
   admin/
     admin-queue.tsx               ✅ Sortable requirements table
-    review-actions.tsx            ✅ Approve/Reject/In Review buttons
+    review-actions.tsx            ✅ Approve / Reject / In Review / Merge buttons
+    merge-dialog.tsx              ✅ Live-search merge target dialog
+  browse/
+    filter-bar.tsx                ✅ Search + persona/category/status/sort filters
+    requirement-card.tsx          ✅ Card used in browse grid
+    pagination.tsx                ✅ Pagination controls
+  requirements/
+    comment-section.tsx           ✅ Comments with edit/delete (own) + flag (others)
+    vote-buttons.tsx              ✅ Optimistic up/down vote UI
+    flag-button.tsx               ✅ Flag button for requirements and comments
   submit/
     requirement-form.tsx          ✅ 3-step submit form
+  auth/
+    sign-in-form.tsx              ✅ Magic link sign-in form
 
 lib/
   supabase/
     client.ts                     ✅ createBrowserClient (client components)
     server.ts                     ✅ createClient (anon SSR) + createServiceClient (service role, sync)
-    types.ts                      ✅ Generated Supabase types
+    types.ts                      ✅ Database types (updated for M5 columns)
+  auth/
+    admin.ts                      ✅ isAdmin(user) — checks ADMIN_EMAILS env
+    context.tsx                   ✅ AuthProvider + useAuth() React context
   claude/
     client.ts                     ✅ Anthropic SDK singleton
-    prompts.ts                    ✅ System prompt + buildRefinementPrompt()
+    prompts.ts                    ✅ REFINEMENT_SYSTEM_PROMPT + buildRefinementPrompt()
     parse.ts                      ✅ parseRefinementResponse()
-  auth/
-    admin.ts                      ✅ isAdmin(user)
   validators/
     requirements.ts               ✅ Zod schemas — PersonaType, FeatureCategory, etc.
   constants/
@@ -234,9 +275,10 @@ scripts/
   seed-requirements.mjs           ✅ Seeds 15 initial requirements from LinkedIn research
 
 supabase/migrations/
-  20260401000000_initial_schema.sql
-  20260401000001_rls_policies.sql
-  20260401000002_functions_triggers.sql
+  20260401000000_initial_schema.sql   ✅ Tables, enums, indexes
+  20260401000001_rls_policies.sql     ✅ Row-level security
+  20260401000002_functions_triggers.sql ✅ Triggers + find_similar_requirements()
+  20260402000000_m5_schema.sql        ✅ M5 — merged_into, is_flagged, flag_reason, updated_at, persona_subscriptions
 ```
 
 ---
@@ -264,26 +306,9 @@ EMAIL_FROM=noreply@sixdegrees.link
 
 ---
 
-## M5 — What's Next (Consolidation & Export)
-
-Target: Jun 30, 2026. Not yet scoped in detail, but the planned scope from the original brief:
-
-- **Deduplication tooling** — admin UI to merge duplicate requirements (`merged_into` FK, status `merged`)
-- **Export** — download requirements as CSV / JSON / GitHub Issues / Linear tickets
-- **Dashboard** — persona coverage heatmap showing which user types have most/fewest requirements
-- **Leaderboard** — top contributors by submission count and upvotes received
-- **Persona subscriptions** — email digest for users subscribed to a persona type (`persona_subscriptions` table, not yet created)
-- **Moderation enhancements** — `is_flagged`, `flag_reason` columns on requirements and comments; user reporting flow
-
----
-
 ## Known Gaps / Deferred Items
 
-- `is_flagged` / `flag_reason` columns not yet added to DB (planned M5)
-- `merged_into` column not yet added (planned M5)
-- `persona_subscriptions` table not yet created (planned M5)
-- No AuthProvider React context — auth state read server-side only; client components use `useEffect` + Supabase client if needed
-- No leaderboard page yet
-- No dashboard/persona coverage page yet
-- Comment editing/deletion not implemented (comments are append-only)
-- No pagination on comments (currently loads all — fine for now, address in M5)
+- No pagination on comments (currently loads all, capped at 50 — acceptable for now)
+- Persona subscription emails not yet sent (table + API exist; email digest not implemented)
+- No GitHub Issues / Linear export (CSV + JSON only; deeper integrations deferred)
+- Admin unflag UI not built (admins can clear flags via service client directly)

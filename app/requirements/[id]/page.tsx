@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/navbar'
 import { VoteButtons } from '@/components/requirements/vote-buttons'
 import { CommentSection } from '@/components/requirements/comment-section'
+import { FlagButton } from '@/components/requirements/flag-button'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -187,6 +188,7 @@ export default async function RequirementPage({ params }: Props) {
                 requirementId={id}
                 initialComments={(comments ?? []) as Parameters<typeof CommentSection>[0]['initialComments']}
                 isAuthenticated={!!user}
+                currentUserId={user?.id ?? null}
               />
             </div>
 
@@ -216,6 +218,21 @@ export default async function RequirementPage({ params }: Props) {
             <div className="req-sidebar__card">
               <p className="req-sidebar__label">Status</p>
               <StatusBadge status={req.status} />
+            </div>
+
+            <div className="req-sidebar__card">
+              <p className="req-sidebar__label">Report</p>
+              <FlagButton
+                targetId={id}
+                targetType="requirement"
+                requirementId={id}
+                isAuthenticated={!!user}
+              />
+              {!user && (
+                <a href={`/signin?next=/requirements/${id}`} className="flag-signin">
+                  Sign in to report
+                </a>
+              )}
             </div>
 
           </aside>
