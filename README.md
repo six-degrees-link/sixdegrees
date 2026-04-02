@@ -1,26 +1,45 @@
 # SixDegrees
 
-## Getting started
+A free, open-source professional network built to replace LinkedIn. This repo is the **requirements gathering platform** — where the community submits, refines, and votes on features before they get built.
 
-This project is hosted on GitHub.
+Every requirement submitted here becomes part of the public spec for SixDegrees. No backroom decisions. No product roadmap owned by a company. The community decides what gets built.
 
-### Add your files
+**Live platform**: https://sixdegrees.link  
+**GitHub**: https://github.com/six-degrees-link/sixdegrees
 
-```
-cd existing_repo
-git remote add origin https://github.com/six-degrees-link/sixdegrees.git
-git branch -M main
-git push -uf origin main
-```
+---
 
-## Collaborate with your team
+## What this is
 
-* [Invite collaborators](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-access-to-your-personal-repositories/inviting-collaborators-to-a-personal-repository)
-* [Create a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)
-* [Enable branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+Community members submit feature requests in plain language. Claude AI refines them into structured user stories. The community votes, comments, and debates. The most important features rise to the top.
 
-## Test and Deploy
+That's it. No account tiers. No promoted content. No algorithm deciding whose ideas matter.
 
-Use GitHub Actions for CI/CD.
+---
 
-* [Get started with GitHub Actions](https://docs.github.com/en/actions/writing-workflows/quickstart)
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 App Router (TypeScript, strict mode) |
+| Styling | Plain CSS custom properties |
+| Database | Supabase (PostgreSQL) |
+| Auth | Supabase Auth — magic links only |
+| AI | Anthropic Claude API |
+| Email | Resend |
+| Hosting | Vercel |
+
+---
+
+## Contributing
+
+There are two ways to contribute:
+
+- **As a community member**: go to https://sixdegrees.link and submit requirements, vote, and comment.
+- **As a developer**: read [CONTRIBUTING.md](CONTRIBUTING.md) to set up locally and start working on the codebase.
+
+---
+
+## License
+
+Open source. See [LICENSE](LICENSE).
