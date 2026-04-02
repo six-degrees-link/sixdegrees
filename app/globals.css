@@ -1717,6 +1717,16 @@ body {
   line-height: 1.5;
 }
 
+.site-footer__link {
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.site-footer__link:hover {
+  color: var(--text-secondary);
+}
+
 /* ============================================================
    M5 — Comment edit / delete
    ============================================================ */

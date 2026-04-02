@@ -49,7 +49,17 @@ export default function HomePage() {
         </section>
       </main>
       <footer className="site-footer">
-        <p className="site-footer__copy">© 2026 SixDegrees</p>
+        <p className="site-footer__copy">
+          © 2026 SixDegrees &mdash;{' '}
+          <a
+            href="https://github.com/six-degrees-link/sixdegrees"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="site-footer__link"
+          >
+            open source on GitHub
+          </a>
+        </p>
       </footer>
     </div>
   )
